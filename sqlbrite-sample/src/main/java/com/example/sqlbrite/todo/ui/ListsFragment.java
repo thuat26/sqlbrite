@@ -27,13 +27,16 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListView;
-import butterknife.ButterKnife;
-import butterknife.InjectView;
-import butterknife.OnItemClick;
+
 import com.example.sqlbrite.todo.R;
 import com.example.sqlbrite.todo.TodoApp;
 import com.squareup.sqlbrite.BriteDatabase;
+
 import javax.inject.Inject;
+
+import butterknife.ButterKnife;
+import butterknife.InjectView;
+import butterknife.OnItemClick;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.schedulers.Schedulers;
@@ -42,81 +45,87 @@ import static android.support.v4.view.MenuItemCompat.SHOW_AS_ACTION_IF_ROOM;
 import static android.support.v4.view.MenuItemCompat.SHOW_AS_ACTION_WITH_TEXT;
 
 public final class ListsFragment extends Fragment {
-  interface Listener {
-    void onListClicked(long id);
-    void onNewListClicked();
-  }
+    @Inject BriteDatabase db;
+    @InjectView(android.R.id.list) ListView listView;
+    @InjectView(android.R.id.empty) View emptyView;
+    private Listener listener;
+    private ListsAdapter adapter;
+    private Subscription subscription;
 
-  static ListsFragment newInstance() {
-    return new ListsFragment();
-  }
-
-  @Inject BriteDatabase db;
-
-  @InjectView(android.R.id.list) ListView listView;
-  @InjectView(android.R.id.empty) View emptyView;
-
-  private Listener listener;
-  private ListsAdapter adapter;
-  private Subscription subscription;
-
-  @Override public void onAttach(Activity activity) {
-    if (!(activity instanceof Listener)) {
-      throw new IllegalStateException("Activity must implement fragment Listener.");
+    static ListsFragment newInstance() {
+        return new ListsFragment();
     }
 
-    super.onAttach(activity);
-    TodoApp.objectGraph(activity).inject(this);
-    setHasOptionsMenu(true);
+    @Override
+    public void onAttach(Activity activity) {
+        if (!(activity instanceof Listener)) {
+            throw new IllegalStateException("Activity must implement fragment Listener.");
+        }
 
-    listener = (Listener) activity;
-    adapter = new ListsAdapter(activity);
-  }
+        super.onAttach(activity);
+        TodoApp.objectGraph(activity).inject(this);
+        setHasOptionsMenu(true);
 
-  @Override public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-    super.onCreateOptionsMenu(menu, inflater);
+        listener = (Listener) activity;
+        adapter = new ListsAdapter(activity);
+    }
 
-    MenuItem item = menu.add(R.string.new_list)
-        .setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-          @Override public boolean onMenuItemClick(MenuItem item) {
-            listener.onNewListClicked();
-            return true;
-          }
-        });
-    MenuItemCompat.setShowAsAction(item, SHOW_AS_ACTION_IF_ROOM | SHOW_AS_ACTION_WITH_TEXT);
-  }
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
 
-  @Override public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
-      @Nullable Bundle savedInstanceState) {
-    return inflater.inflate(R.layout.lists, container, false);
-  }
+        MenuItem item = menu.add(R.string.new_list)
+                .setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                    @Override
+                    public boolean onMenuItemClick(MenuItem item) {
+                        listener.onNewListClicked();
+                        return true;
+                    }
+                });
+        MenuItemCompat.setShowAsAction(item, SHOW_AS_ACTION_IF_ROOM | SHOW_AS_ACTION_WITH_TEXT);
+    }
 
-  @Override
-  public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
-    ButterKnife.inject(this, view);
-    listView.setEmptyView(emptyView);
-    listView.setAdapter(adapter);
-  }
+    @Override
+    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.lists, container, false);
+    }
 
-  @OnItemClick(android.R.id.list) void listClicked(long listId) {
-    listener.onListClicked(listId);
-  }
+    @Override
+    public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        ButterKnife.inject(this, view);
+        listView.setEmptyView(emptyView);
+        listView.setAdapter(adapter);
+    }
 
-  @Override public void onResume() {
-    super.onResume();
+    @OnItemClick(android.R.id.list)
+    void listClicked(long listId) {
+        listener.onListClicked(listId);
+    }
 
-    getActivity().setTitle("To-Do");
+    @Override
+    public void onResume() {
+        super.onResume();
 
-    subscription = db.createQuery(ListsItem.TABLES, ListsItem.QUERY)
-        .mapToList(ListsItem.MAPPER)
-        .subscribeOn(Schedulers.io())
-        .observeOn(AndroidSchedulers.mainThread())
-        .subscribe(adapter);
-  }
+        getActivity().setTitle("To-Do");
 
-  @Override public void onPause() {
-    super.onPause();
-    subscription.unsubscribe();
-  }
+        subscription = db.createQuery(ListsItem.TABLES, ListsItem.QUERY)
+                .mapToList(ListsItem.MAPPER)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(adapter);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        subscription.unsubscribe();
+    }
+
+    interface Listener {
+        void onListClicked(long id);
+
+        void onNewListClicked();
+    }
 }
